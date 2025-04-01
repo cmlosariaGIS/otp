@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Trip Planner</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.css" />
+    <!-- Vietnamese font from Google Fonts -->
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" />
+    <!-- Material Symbols from Google -->
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo-container">
+                <a href="https://enfarm.com" target="_blank">
+                    <img src="https://i.ibb.co/LCK5s6V/en-Farm-logo-6-2x.png" alt="enfarm Logo" class="enfarm-logo">
+                </a>
+            </div>
+            <h2><i class="fa-solid fa-route"></i> Optimized Trip Planner</h2>
+            <p>Enter up to 5 destinations to analyze the optimal route.</p>
+            <p class="instruction">
+                You can add destinations by:
+                <br>• Clicking directly on the map
+                <br>• Entering an address or place name
+                <br>• Entering coordinates (e.g., 12.692, 108.062)
+            </p>
+
+            <div id="destinations-container">
+                <!-- Destinations will be added here -->
+            </div>
+
+            <button id="add-destination" type="button">
+                <span class="material-symbols-outlined">location_on</span>
+                Add a Destination
+            </button>
+            <button id="calculate-route" type="button" disabled>
+                <span class="material-symbols-outlined">turn_sharp_right</span>
+                Calculate Optimal Route
+            </button>
+            <button id="clear-all" type="button">
+                <span class="material-symbols-outlined">delete_forever</span>
+                Clear All
+            </button>
+
+            <div class="input-group" style="margin-top: 15px;">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="show-direction-arrows" checked>
+                    <span>Show trip direction arrows</span>
+                </label>
+            </div>
+
+            <div id="loading">
+                <div class="spinner"></div> Calculating route...
+            </div>
+
+            <div id="error-message" class="error"></div>
+
+            <div id="results" class="results" style="display: none;">
+                <h2>Route Results</h2>
+                <div id="destinations-list"></div>
+
+                <div class="route-stats">
+                    <div><strong>Total Distance:</strong> <span id="total-distance">0</span> km</div>
+                    <!--<div><strong>Estimated Time:</strong> <span id="total-time">0</span></div>-->
+                </div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <!-- Leaflet Routing Machine JS -->
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+</body>
+
+</html>
