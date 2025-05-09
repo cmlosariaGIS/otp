@@ -20,6 +20,45 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css" />
+    
+    <style>
+        /* Close button for routing panel */
+        .routing-close-btn {
+            position: absolute;
+            top: 8px;
+            right: 0px;
+            background-color: transparent;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            justify-content: right;
+            align-items: right;
+            outline: none;
+        }
+        
+        .routing-close-btn:hover,
+        .routing-close-btn:focus,
+        .routing-close-btn:active {
+            background-color: transparent;
+            outline: none;
+            box-shadow: none;
+        }
+        
+        .routing-close-btn .material-symbols-outlined {
+            color: #777777;
+            font-size: 22px;
+            font-weight: 500;
+        }
+        
+        /* Ensure routing container has proper positioning */
+        .leaflet-routing-container {
+            position: relative;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+    </style>
 </head>
 
 <body>
@@ -31,11 +70,12 @@
                 </a>
             </div>
             <h2><i class="fa-solid fa-route"></i> Optimized Trip Planner</h2>
-            <p>Enter up to 5 destinations to analyze the optimal route.</p>
+            <p>Enter up to 8 destinations to analyze the optimal route.</p>
             <p class="instruction">
-                You can add destinations by:
+                <b>💡 INSTRUCTIONS</b>
+                <br>You can add destinations by either:
                 <br>• Clicking directly on the map
-                <br>• Entering an address or place name
+                <br>• Entering a farm name, address or place name
                 <br>• Entering coordinates (e.g., 12.692, 108.062)
             </p>
 
@@ -70,12 +110,11 @@
             <div id="error-message" class="error"></div>
 
             <div id="results" class="results" style="display: none;">
-                <h2>Route Results</h2>
+                <h3>Optimized Route Results</h3>
                 <div id="destinations-list"></div>
 
                 <div class="route-stats">
                     <div><strong>Total Distance:</strong> <span id="total-distance">0</span> km</div>
-                    <!--<div><strong>Estimated Time:</strong> <span id="total-time">0</span></div>-->
                 </div>
             </div>
         </div>
@@ -90,7 +129,12 @@
         src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
 
     <!-- Custom JS -->
-    <script src="script.js"></script>
+    <!--<script src="script.js"></script>-->
+    <script src="map.js"></script>
+    <script src="main.js"></script>
+    <script src="search.js"></script>
+    <script src="routing.js"></script>
+
 
     <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
 </body>

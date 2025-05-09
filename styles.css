@@ -95,7 +95,7 @@ button {
     border: none;
     padding: 10px 15px;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 10px;
     font-weight: 600;
     width: 100%;
     margin-bottom: 10px;
@@ -301,11 +301,11 @@ button:disabled {
     margin: 10px !important;
     border-radius: 10px !important;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1) !important;
-    max-height: 70vh !important;
+    max-height: 85vh !important; /*height of the turn but turn directions panel*/
     overflow-y: auto !important;
     font-family: 'Be Vietnam Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-    width: 400px !important; /* Set fixed width to 400px */
-    max-width: 400px !important; /* Ensure it doesn't exceed 400px */
+    width: 400px !important;
+    max-width: 400px !important;
 }
 
 .leaflet-routing-alt {
@@ -459,3 +459,13 @@ button:disabled {
     margin-bottom: 2px;
 }
 
+
+
+.instruction-row-interactive:hover {
+    background-color: #f0f8ff !important; /* Light blue highlight on hover */
+    transition: background-color 0.2s ease;
+}
+
+.leaflet-routing-alt tr {
+    cursor: pointer;
+}

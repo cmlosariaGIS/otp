@@ -23,8 +23,8 @@ const enfarmOfficeLocation = {
 let markers = [];
 let routingControl = null;
 let destinationCount = 0;
-const maxDestinations = 5;
-const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'];
+const maxDestinations = 8; // Changed from 5 to 8
+const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e']; // Added 3 more colors
 let showDirectionArrows = true;
 
 // DOM elements
@@ -37,7 +37,6 @@ const errorMessage = document.getElementById('error-message');
 const resultsSection = document.getElementById('results');
 const destinationsList = document.getElementById('destinations-list');
 const totalDistanceEl = document.getElementById('total-distance');
-//const totalTimeEl = document.getElementById('total-time');
 const showDirectionArrowsCheckbox = document.getElementById('show-direction-arrows');
 
 // Add event listeners
@@ -62,7 +61,7 @@ function getDestinationLabel(index) {
 // Function to add a destination input field
 function addDestinationField(latLng = null) {
     if (destinationCount >= maxDestinations) {
-        showError('Maximum of 5 destinations allowed');
+        showError('Maximum of 8 destinations allowed'); // Updated error message
         return;
     }
 
@@ -312,30 +311,30 @@ function calculateRoute() {
 // Function to calculate the optimal route
 function calculateOptimalRoute(waypoints) {
     const n = waypoints.length;
-    
+
     // Show loading indicator
     loadingIndicator.style.display = 'block';
-    
+
     // Create a string of coordinates for the OSRM API
     const coordinates = waypoints.map(point => `${point.latLng.lng},${point.latLng.lat}`).join(';');
     const url = `https://router.project-osrm.org/table/v1/driving/${coordinates}?annotations=distance`;
-    
+
     fetch(url)
         .then(response => response.json())
         .then(data => {
             if (data.code === 'Ok') {
                 const distanceMatrix = data.distances;
-                
+
                 // Implement a greedy algorithm (nearest neighbor) to find the optimal route
                 const optimalRoute = [waypoints[0]]; // Start with the first waypoint
                 const visited = new Set([0]);
                 let currentIndex = 0;
-                
+
                 // Visit all destinations
                 while (visited.size < n) {
                     let minDistance = Infinity;
                     let nextIndex = -1;
-                    
+
                     // Find nearest unvisited destination
                     for (let i = 0; i < n; i++) {
                         if (!visited.has(i) && distanceMatrix[currentIndex][i] < minDistance) {
@@ -343,17 +342,17 @@ function calculateOptimalRoute(waypoints) {
                             nextIndex = i;
                         }
                     }
-                    
+
                     if (nextIndex !== -1) {
                         optimalRoute.push(waypoints[nextIndex]);
                         visited.add(nextIndex);
                         currentIndex = nextIndex;
                     }
                 }
-                
+
                 // Add the origin as the final destination to create a round trip
                 optimalRoute.push(waypoints[0]);
-                
+
                 // Create the route with optimal order
                 createRoute(optimalRoute);
             } else {
@@ -376,7 +375,7 @@ function createRoute(optimizedWaypoints) {
     const routingWaypoints = optimizedWaypoints.map((point) => {
         return L.Routing.waypoint(point.latLng, point.name);
     });
-    
+
     // Create routing control
     routingControl = L.Routing.control({
         waypoints: routingWaypoints,
@@ -390,9 +389,16 @@ function createRoute(optimizedWaypoints) {
         lineOptions: {
             styles: [{ color: '#3498db', weight: 6, opacity: 0.8 }]
         },
-        createMarker: function() { return null; } // Don't create default markers
+        createMarker: function () { return null; }, // Don't create default markers
+
+        // Add formatter to customize the route summary
+        formatter: new L.Routing.Formatter({
+            distanceTemplate: '{value} {unit}',
+            summaryTemplate: '{distance}', // Only show distance, no time
+            timeTemplate: '' // Empty template for time to hide it
+        })
     }).addTo(map);
-    
+
     // Update marker labels with new order
     optimizedWaypoints.forEach((point, idx) => {
         const marker = markers[point.originalIndex];
@@ -429,40 +435,77 @@ function createRoute(optimizedWaypoints) {
     });
 
     // Handle route calculation events
-    routingControl.on('routesfound', function(e) {
+    routingControl.on('routesfound', function (e) {
         loadingIndicator.style.display = 'none';
-        
+
         const routes = e.routes;
         const route = routes[0]; // Use the first route
-        
+
         // Display route summary
         const distance = (route.summary.totalDistance / 1000).toFixed(1); // km
-        
+
         totalDistanceEl.textContent = distance;
-        
+
         // Populate the destinations list
         populateDestinationsList(optimizedWaypoints);
-        
+
         // Show results section
         resultsSection.style.display = 'block';
-        
+
         // Style arrival instructions to make them bold
         styleArrivalInstructions();
-        
+
         // Add direction arrows to the route line
         addDirectionArrows(route.coordinates);
+
+        // Add a close button to the routing panel
+        addCloseButtonToRoutingPanel();
     });
-    
-    routingControl.on('routingerror', function(e) {
+
+    routingControl.on('routingerror', function (e) {
         loadingIndicator.style.display = 'none';
         showError('Error calculating route: ' + e.error.message);
     });
 }
 
+// Function to add a close button to the routing panel
+function addCloseButtonToRoutingPanel() {
+    // Wait a bit for the DOM to be updated
+    setTimeout(() => {
+        // Find the routing container
+        const routingContainer = document.querySelector('.leaflet-routing-container');
+
+        if (routingContainer && !routingContainer.querySelector('.routing-close-btn')) {
+            // Create close button with Material Icon
+            const closeButton = document.createElement('button');
+            closeButton.className = 'routing-close-btn';
+            closeButton.title = 'Close directions panel';
+
+            // Create Material Icon span element
+            const closeIcon = document.createElement('span');
+            closeIcon.className = 'material-symbols-outlined';
+            closeIcon.textContent = 'close';
+            closeButton.appendChild(closeIcon);
+
+            // Add click handler
+            closeButton.addEventListener('click', function () {
+                // Find the routing container again (in case it changed)
+                const container = document.querySelector('.leaflet-routing-container');
+                if (container) {
+                    container.style.display = 'none';
+                }
+            });
+
+            // Add the button to the routing container
+            routingContainer.insertBefore(closeButton, routingContainer.firstChild);
+        }
+    }, 200);
+}
+
 // Add event listener for the checkbox
-showDirectionArrowsCheckbox.addEventListener('change', function() {
+showDirectionArrowsCheckbox.addEventListener('change', function () {
     showDirectionArrows = this.checked;
-    
+
     // If there's an active route, update the arrows
     if (routingControl && window.routeCoordinates) {
         if (showDirectionArrows) {
@@ -477,21 +520,21 @@ showDirectionArrowsCheckbox.addEventListener('change', function() {
 function addDirectionArrows(coordinates) {
     // Store the coordinates for later use
     window.routeCoordinates = coordinates;
-    
+
     // If arrows are turned off, don't add them
     if (!showDirectionArrows) {
         return;
     }
-    
+
     // Remove any existing decorators
     removeDirectionArrows();
-    
+
     // Create a polyline from the route coordinates
     const routeLine = L.polyline(coordinates, {
         opacity: 0, // Make this invisible so we don't see duplicate lines
         weight: 1
     }).addTo(map);
-    
+
     // Create the decorator with arrow patterns
     const decorator = L.polylineDecorator(routeLine, {
         patterns: [
@@ -512,7 +555,7 @@ function addDirectionArrows(coordinates) {
             }
         ]
     }).addTo(map);
-    
+
     // Store references to remove them later
     window.currentDecorator = decorator;
     window.invisibleRouteLine = routeLine;
@@ -525,7 +568,7 @@ function removeDirectionArrows() {
         map.removeLayer(window.currentDecorator);
         window.currentDecorator = null;
     }
-    
+
     // Remove invisible line used for decoration
     if (window.invisibleRouteLine) {
         map.removeLayer(window.invisibleRouteLine);
@@ -574,31 +617,19 @@ function populateDestinationsList(waypoints) {
     });
 }
 
-// Function to format duration in hours and minutes
-function formatDuration(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    if (hours > 0) {
-        return `${hours} h ${minutes} min`;
-    } else {
-        return `${minutes} min`;
-    }
-}
-
 // Function to clear the route
 function clearRoute() {
     if (routingControl) {
         map.removeControl(routingControl);
         routingControl = null;
     }
-    
+
     // Clear route coordinates
     window.routeCoordinates = null;
-    
+
     // Remove direction arrows
     removeDirectionArrows();
-    
+
     // Reset marker tooltips to non-permanent
     markers.forEach((marker, index) => {
         if (marker) {
@@ -606,7 +637,7 @@ function clearRoute() {
             marker.bindTooltip(getDestinationLabel(index));
         }
     });
-    
+
     errorMessage.style.display = 'none';
 }
 
@@ -656,7 +687,7 @@ function showError(message) {
 function onMapClick(e) {
     // If we've already reached max destinations, show error
     if (destinationCount >= maxDestinations) {
-        showError('Maximum of 5 destinations allowed');
+        showError('Maximum of 8 destinations allowed'); // Updated error message
         return;
     }
 
@@ -682,26 +713,95 @@ function onMapClick(e) {
         });
 }
 
-// Function to make "You have arrived at your destination" text bold and add flag emoji
+// Function to make directions interactive and add flag emoji to arrivals
 function styleArrivalInstructions() {
     // This function runs after the route is created and displayed
     setTimeout(() => {
-        // Find all instruction cells in the routing table
-        const instructionCells = document.querySelectorAll('.leaflet-routing-alt tr td:nth-child(2)');
-        
-        // Loop through each cell
-        instructionCells.forEach(cell => {
+        // Find all instruction rows in the routing table
+        const instructionRows = document.querySelectorAll('.leaflet-routing-alt tbody tr');
+
+        // Loop through each row
+        instructionRows.forEach((row) => {
+            const cell = row.querySelector('td:nth-child(2)');
+            if (!cell) return;
+
             // Check if the text contains "You have arrived"
             if (cell.textContent.includes('You have arrived')) {
                 // Add the flag emoji to the text
                 cell.textContent = '🏳️ ' + cell.textContent;
-                
+
                 // Add the arrival-instruction class to this cell
                 cell.classList.add('arrival-instruction');
             }
+
+            // Make the row clickable
+            row.style.cursor = 'pointer';
+
+            // Add hover effect
+            row.classList.add('instruction-row-interactive');
+
+            // Get the coordinate data from the row's data attribute if possible
+            // In Leaflet Routing Machine, each instruction row has a latLng property
+            row.addEventListener('click', function () {
+                // Try to get coordinates directly from the instruction
+                if (row.getAttribute('data-lat') && row.getAttribute('data-lng')) {
+                    // Some versions of Leaflet Routing Machine store coordinates as data attributes
+                    const lat = parseFloat(row.getAttribute('data-lat'));
+                    const lng = parseFloat(row.getAttribute('data-lng'));
+                    map.setView([lat, lng], 20);
+                } else {
+                    // Fallback: extract coordinates from the instruction text if possible
+                    // This is a bit hacky but can work for many routing engines
+                    const coordMatch = cell.textContent.match(/\((-?\d+\.\d+),\s*(-?\d+\.\d+)\)/);
+                    if (coordMatch && coordMatch.length === 3) {
+                        const lat = parseFloat(coordMatch[1]);
+                        const lng = parseFloat(coordMatch[2]);
+                        map.setView([lat, lng], 20);
+                    } else if (routingControl && routingControl._routes && routingControl._routes[0]) {
+                        // Another fallback: use the route's waypoints
+                        // Find which waypoint this instruction is closest to
+                        const route = routingControl._routes[0];
+                        const instructions = route.instructions || [];
+
+                        // Try to find the instruction index
+                        let instructionIndex = -1;
+                        instructionRows.forEach((r, idx) => {
+                            if (r === row) instructionIndex = idx;
+                        });
+
+                        if (instructionIndex >= 0 && instructionIndex < instructions.length) {
+                            // Use the coordinate for this instruction
+                            const instruction = instructions[instructionIndex];
+                            if (instruction.index !== undefined && route.coordinates) {
+                                const latlng = L.latLng(
+                                    route.coordinates[instruction.index].lat,
+                                    route.coordinates[instruction.index].lng
+                                );
+                                map.setView(latlng, 20);
+                                return;
+                            }
+                        }
+
+                        // Final fallback: use proportional mapping
+                        const totalInstructions = instructionRows.length;
+                        const totalCoords = route.coordinates.length;
+                        const coordIndex = Math.min(
+                            Math.floor((instructionIndex / totalInstructions) * totalCoords),
+                            totalCoords - 1
+                        );
+                        const latlng = L.latLng(
+                            route.coordinates[coordIndex].lat,
+                            route.coordinates[coordIndex].lng
+                        );
+                        map.setView(latlng, 16);
+                    }
+                }
+            });
         });
     }, 500);
 }
+
+
 
 // Add initial destination with Enfarm Office
 addDestinationField();
@@ -719,9 +819,9 @@ function createSearchControl() {
 
             const input = L.DomUtil.create('input', '', container);
             input.type = 'text';
-            input.placeholder = 'Search for a location or enter coordinates...';
+            input.placeholder = 'Search for a customer farm, a location or enter coordinates...';
             input.style.padding = '8px';
-            input.style.width = '300px';
+            input.style.width = '420px';
             input.style.border = '1px solid #ccc';
             input.style.borderRadius = '4px';
             input.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'; // Add shadow
@@ -762,7 +862,7 @@ function searchLocation(searchText) {
         const [lat, lng] = searchText.split(',').map(coord => parseFloat(coord.trim()));
 
         // Pan the map to the coordinates
-        map.setView([lat, lng], 15);
+        map.setView([lat, lng], 10);
 
         // Create a temporary marker
         const tempMarker = L.marker([lat, lng]).addTo(map);
@@ -779,7 +879,7 @@ function searchLocation(searchText) {
                 addDestinationField({ lat: lat, lng: lng });
                 map.removeLayer(tempMarker);
             } else {
-                showError('Maximum of 5 destinations allowed');
+                showError('Maximum of 8 destinations allowed'); // Updated error message
             }
         };
 
@@ -800,7 +900,7 @@ function searchLocation(searchText) {
                     const lng = parseFloat(result.lon);
 
                     // Pan the map to the result
-                    map.setView([lat, lng], 15);
+                    map.setView([lat, lng], 10);
 
                     // Create a temporary marker
                     const tempMarker = L.marker([lat, lng]).addTo(map);
@@ -817,7 +917,7 @@ function searchLocation(searchText) {
                             addDestinationField({ lat: lat, lng: lng });
                             map.removeLayer(tempMarker);
                         } else {
-                            showError('Maximum of 5 destinations allowed');
+                            showError('Maximum of 8 destinations allowed'); // Updated error message
                         }
                     };
 
@@ -914,3 +1014,1469 @@ function createBasemapControl() {
     // Add the basemap control to the map
     map.addControl(new basemapControl());
 }
+
+/*
+
+// Add this new function to create the direction arrows with animation
+function addDirectionArrows(coordinates) {
+    // Store the coordinates for later use
+    window.routeCoordinates = coordinates;
+    
+    // If arrows are turned off, don't add them
+    if (!showDirectionArrows) {
+        return;
+    }
+    
+    // Remove any existing decorators
+    removeDirectionArrows();
+    
+    // Create a polyline from the route coordinates
+    const routeLine = L.polyline(coordinates, {
+        opacity: 0, // Make this invisible so we don't see duplicate lines
+        weight: 1
+    }).addTo(map);
+    
+    // Create the decorator with arrow patterns
+    const decorator = L.polylineDecorator(routeLine, {
+        patterns: [
+            {
+                offset: 0,
+                repeat: 150, // Repeat every 150 pixels
+                symbol: L.Symbol.arrowHead({
+                    pixelSize: 12, // Size of the arrow
+                    polygon: false,
+                    pathOptions: {
+                        stroke: true,
+                        color: '#FFFFFF', // White color for visibility
+                        weight: 2,
+                        fillOpacity: 1,
+                        opacity: 0.8
+                    }
+                })
+            }
+        ]
+    }).addTo(map);
+    
+    // Store references to remove them later
+    window.currentDecorator = decorator;
+    window.invisibleRouteLine = routeLine;
+    
+    // Add animation to the arrows
+    animateArrows();
+}
+
+// Function to animate the direction arrows
+function animateArrows() {
+    if (!window.currentDecorator || !showDirectionArrows) return;
+    
+    let offset = 0;
+    const animationSpeed = 50; // ms between animation frames (lower = faster)
+    const step = 1; // How far to move each frame
+    
+    // Clear any existing animation
+    if (window.arrowAnimation) {
+        clearInterval(window.arrowAnimation);
+    }
+    
+    // Create animation interval
+    window.arrowAnimation = setInterval(() => {
+        offset = (offset + step) % 150; // Reset after reaching pattern repeat distance
+        
+        // Update the pattern offset
+        window.currentDecorator.setPatterns([
+            {
+                offset: offset,
+                repeat: 150,
+                symbol: L.Symbol.arrowHead({
+                    pixelSize: 12,
+                    polygon: false,
+                    pathOptions: {
+                        stroke: true,
+                        color: '#FFFFFF',
+                        weight: 2,
+                        fillOpacity: 1,
+                        opacity: 0.8
+                    }
+                })
+            }
+        ]);
+    }, animationSpeed);
+}
+
+// Modified to also clear animation interval
+function removeDirectionArrows() {
+    // Clear animation interval
+    if (window.arrowAnimation) {
+        clearInterval(window.arrowAnimation);
+        window.arrowAnimation = null;
+    }
+    
+    // Remove any existing direction arrows
+    if (window.currentDecorator) {
+        map.removeLayer(window.currentDecorator);
+        window.currentDecorator = null;
+    }
+    
+    // Remove invisible line used for decoration
+    if (window.invisibleRouteLine) {
+        map.removeLayer(window.invisibleRouteLine);
+        window.invisibleRouteLine = null;
+    }
+}
+    */
+
+
+// Function to animate the route progression - to be called after route calculation
+function animateRouteProgression(coordinates) {
+    // Store the coordinates for later use
+    window.routeCoordinates = coordinates;
+
+    // Remove any existing route animations
+    removeRouteAnimations();
+
+    // Create a visible polyline that will grow
+    // First create a shadow effect with black line
+    const shadowLine = L.polyline([], {
+        color: '#000000',
+        weight: 14, // Widest line for shadow
+        opacity: 0.3, // Very transparent
+        lineCap: 'round',
+        lineJoin: 'round',
+        offset: 2 // Slight offset to create shadow effect
+    }).addTo(map);
+
+    // Then create a glow effect with wider, semi-transparent line
+    const glowLine = L.polyline([], {
+        color: '#3498db',
+        weight: 12, // Wider line for glow
+        opacity: 0.4, // Semi-transparent
+        lineCap: 'round',
+        lineJoin: 'round'
+    }).addTo(map);
+
+    // Then add the main line on top
+    const progressLine = L.polyline([], {
+        color: '#3498db',
+        weight: 6,
+        opacity: 0.9, // Increased for better contrast
+        lineCap: 'round',
+        lineJoin: 'round'
+    }).addTo(map);
+
+    // Store references to remove them later
+    window.shadowLine = shadowLine;
+    window.glowLine = glowLine;
+    window.progressLine = progressLine;
+
+    // Animation variables
+    let currentSegment = 0;
+    let currentPoint = 0;
+    const totalPoints = coordinates.length;
+    const pointsPerFrame = 2; // Reduced from 3 to 1 for slower animation
+    const segmentDelay = 500; // Increased from 500 to 800 milliseconds
+
+    // Function to animate a single segment of the route
+    function animateSegment() {
+        // Get start and end indices for the current segment
+        const segmentStartIndex = currentSegment;
+        let segmentEndIndex = coordinates.length - 1;
+
+        // Find the next waypoint (or destination) index
+        if (routingControl && routingControl._routes && routingControl._routes[0] && routingControl._routes[0].waypointIndices) {
+            const waypointIndices = routingControl._routes[0].waypointIndices;
+
+            // If we have more waypoints to process
+            if (currentSegment < waypointIndices.length - 1) {
+                segmentEndIndex = waypointIndices[currentSegment + 1];
+            }
+        }
+
+        // Animation frame function for this segment
+        function animateFrame() {
+            // Add points to the line for this frame
+            for (let i = 0; i < pointsPerFrame; i++) {
+                if (currentPoint <= segmentEndIndex) {
+                    // Update all three lines - shadow, glow, and main
+                    const displayPoints = progressLine.getLatLngs();
+                    displayPoints.push(coordinates[currentPoint]);
+                    shadowLine.setLatLngs(displayPoints); // Update shadow line
+                    glowLine.setLatLngs(displayPoints); // Update glow line
+                    progressLine.setLatLngs(displayPoints); // Update main line
+                    currentPoint++;
+                } else {
+                    // We've finished this segment
+                    clearInterval(animationInterval);
+
+                    // Move to the next segment
+                    currentSegment++;
+
+                    // If we have more segments to animate
+                    if (currentSegment < (routingControl._routes[0].waypointIndices?.length - 1 || 0)) {
+                        // After a delay, start the next segment
+                        setTimeout(animateSegment, segmentDelay);
+                    } else if (currentPoint < totalPoints) {
+                        // Animate the final segment back to the origin (for round trips)
+                        setTimeout(animateSegment, segmentDelay);
+                    } else {
+                        // We've finished all segments, add animated directional arrows
+                        if (showDirectionArrows) {
+                            addAnimatedDirectionArrows(coordinates);
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+
+        // Start animation for this segment
+        const animationInterval = setInterval(animateFrame, 100); // Increased from 50 to 100 milliseconds
+    }
+
+    // Start the animation with the first segment
+    animateSegment();
+}
+
+// Function to remove route animations
+function removeRouteAnimations() {
+    // Remove any existing route progression line
+    if (window.progressLine) {
+        map.removeLayer(window.progressLine);
+        window.progressLine = null;
+    }
+
+    // Remove the glow line
+    if (window.glowLine) {
+        map.removeLayer(window.glowLine);
+        window.glowLine = null;
+    }
+
+    // Remove the shadow line
+    if (window.shadowLine) {
+        map.removeLayer(window.shadowLine);
+        window.shadowLine = null;
+    }
+
+    // Also remove direction arrows
+    removeDirectionArrows();
+}
+
+// Function to create the actual route - modified to use animation
+function createRoute(optimizedWaypoints) {
+    // Prepare waypoints for routing
+    const routingWaypoints = optimizedWaypoints.map((point) => {
+        return L.Routing.waypoint(point.latLng, point.name);
+    });
+
+    // Create routing control
+    routingControl = L.Routing.control({
+        waypoints: routingWaypoints,
+        routeWhileDragging: false,
+        showAlternatives: false,
+        fitSelectedRoutes: true,
+        router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            profile: 'driving'
+        }),
+        lineOptions: {
+            styles: [{ color: '#3498db', weight: 6, opacity: 0 }], // Make the default line invisible
+            addWaypoints: false // Don't show the draggable waypoints
+        },
+        createMarker: function () { return null; }, // Don't create default markers
+
+        // Add formatter to customize the route summary
+        formatter: new L.Routing.Formatter({
+            distanceTemplate: '{value} {unit}',
+            summaryTemplate: '{distance}', // Only show distance, no time
+            timeTemplate: '' // Empty template for time to hide it
+        })
+    }).addTo(map);
+
+    // Update marker labels with new order
+    optimizedWaypoints.forEach((point, idx) => {
+        const marker = markers[point.originalIndex];
+        if (marker) {
+            // Update visual markers
+            const color = colors[idx]; // Use the color based on new sequence
+
+            // Create new icon with new color and number/letter
+            const displayChar = idx === 0 ? "O" : idx.toString();
+
+            const icon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 12px;">${displayChar}</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+
+            marker.setIcon(icon);
+
+            // Update tooltip
+            marker.unbindTooltip();
+
+            const originalLabel = getDestinationLabel(point.originalIndex);
+            const newLabel = idx === 0 ? "Origin" : `🏳️ Stop ${idx}`;
+
+            marker.bindTooltip(`${newLabel} (${originalLabel})`, {
+                permanent: true,
+                direction: 'top',
+                offset: [0, -10],
+                className: 'permanent-tooltip'
+            }).openTooltip();
+        }
+    });
+
+    // Handle route calculation events
+    routingControl.on('routesfound', function (e) {
+        loadingIndicator.style.display = 'none';
+
+        const routes = e.routes;
+        const route = routes[0]; // Use the first route
+
+        // Display route summary
+        const distance = (route.summary.totalDistance / 1000).toFixed(1); // km
+
+        totalDistanceEl.textContent = distance;
+
+        // Populate the destinations list
+        populateDestinationsList(optimizedWaypoints);
+
+        // Show results section
+        resultsSection.style.display = 'block';
+
+        // Style arrival instructions to make them bold
+        styleArrivalInstructions();
+
+        // Start the route progression animation instead of showing the entire route at once
+        animateRouteProgression(route.coordinates);
+
+        // Add a close button to the routing panel
+        addCloseButtonToRoutingPanel();
+    });
+
+    routingControl.on('routingerror', function (e) {
+        loadingIndicator.style.display = 'none';
+        showError('Error calculating route: ' + e.error.message);
+    });
+}
+
+// Function to add animated direction arrows
+function addAnimatedDirectionArrows(coordinates) {
+    // Store the coordinates for later use
+    window.routeCoordinates = coordinates;
+
+    // If arrows are turned off, don't add them
+    if (!showDirectionArrows) {
+        return;
+    }
+
+    // Remove any existing decorators
+    removeDirectionArrows();
+
+    // Create a polyline from the route coordinates (invisible)
+    const routeLine = L.polyline(coordinates, {
+        opacity: 0, // Make this invisible so we don't see duplicate lines
+        weight: 1
+    }).addTo(map);
+
+    // Create the decorator with arrow patterns
+    const decorator = L.polylineDecorator(routeLine, {
+        patterns: [
+            {
+                offset: 0,
+                repeat: 300, // Increased from 150 to 300 pixels - fewer arrows
+                symbol: L.Symbol.arrowHead({
+                    pixelSize: 12, // Size of the arrow
+                    polygon: false,
+                    pathOptions: {
+                        stroke: true,
+                        color: '#FFFFFF', // White color for visibility
+                        weight: 2,
+                        fillOpacity: 1,
+                        opacity: 0.8
+                    }
+                })
+            }
+        ]
+    }).addTo(map);
+
+    // Store references to remove them later
+    window.currentDecorator = decorator;
+    window.invisibleRouteLine = routeLine;
+
+    // Add animation to the arrows
+    animateArrows();
+}
+
+// Function to animate the direction arrows
+function animateArrows() {
+    if (!window.currentDecorator || !showDirectionArrows) return;
+
+    let offset = 0;
+    const animationSpeed = 50; // ms between animation frames (lower = faster)
+    const step = 1; // How far to move each frame
+
+    // Clear any existing animation
+    if (window.arrowAnimation) {
+        clearInterval(window.arrowAnimation);
+    }
+
+    // Create animation interval
+    window.arrowAnimation = setInterval(() => {
+        offset = (offset + step) % 300; // Reset after reaching pattern repeat distance (increased to 300)
+
+        // Update the pattern offset
+        window.currentDecorator.setPatterns([
+            {
+                offset: offset,
+                repeat: 300, // Increased to 300 pixels to match the pattern definition
+                symbol: L.Symbol.arrowHead({
+                    pixelSize: 12,
+                    polygon: false,
+                    pathOptions: {
+                        stroke: true,
+                        color: '#FFFFFF',
+                        weight: 2,
+                        fillOpacity: 1,
+                        opacity: 0.8
+                    }
+                })
+            }
+        ]);
+    }, animationSpeed);
+}
+
+// Function to remove direction arrows
+function removeDirectionArrows() {
+    // Clear animation interval
+    if (window.arrowAnimation) {
+        clearInterval(window.arrowAnimation);
+        window.arrowAnimation = null;
+    }
+
+    // Remove any existing direction arrows
+    if (window.currentDecorator) {
+        map.removeLayer(window.currentDecorator);
+        window.currentDecorator = null;
+    }
+
+    // Remove invisible line used for decoration
+    if (window.invisibleRouteLine) {
+        map.removeLayer(window.invisibleRouteLine);
+        window.invisibleRouteLine = null;
+    }
+}
+
+// Add event listener for the checkbox - modified to handle the new animation
+showDirectionArrowsCheckbox.addEventListener('change', function () {
+    showDirectionArrows = this.checked;
+
+    // If there's an active route and a progressLine, toggle arrows on the progressLine
+    if (routingControl && window.routeCoordinates) {
+        if (showDirectionArrows) {
+            addAnimatedDirectionArrows(window.routeCoordinates);
+        } else {
+            removeDirectionArrows();
+        }
+    }
+});
+
+// Function to clear the route - modified to remove animations
+function clearRoute() {
+    if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+    }
+
+    // Clear route coordinates
+    window.routeCoordinates = null;
+
+    // Remove animations
+    removeRouteAnimations();
+
+    // Reset marker tooltips to non-permanent
+    markers.forEach((marker, index) => {
+        if (marker) {
+            marker.unbindTooltip();
+            marker.bindTooltip(getDestinationLabel(index));
+        }
+    });
+
+    errorMessage.style.display = 'none';
+}
+
+
+
+
+
+
+// Variable to store farm location markers
+let farmMarkers = [];
+let farmLayerGroup = null;
+let farmsVisible = false;
+
+// Function to fetch and display farm locations
+function fetchAndDisplayFarmLocations() {
+    // If farms are already loaded and visible, toggle them off
+    if (farmLayerGroup && farmsVisible) {
+        hideFarms();
+        return;
+    }
+
+    // If farms are already loaded but hidden, show them
+    if (farmLayerGroup && !farmsVisible) {
+        showFarms();
+        return;
+    }
+
+    // Otherwise, fetch and load farms
+    // Show loading indicator
+    loadingIndicator.style.display = 'block';
+
+    // Fetch data from the API
+    fetch('https://api-ma.enfarm.com/api/v1/ma/get-install-locations')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+
+            // Check if we got valid data
+            if (data && Array.isArray(data.content)) {
+                // Add markers for each farm location
+                addFarmLocationMarkers(data.content);
+                // Set farms visible flag
+                farmsVisible = true;
+                // Update toggle button text
+                updateFarmToggleButton();
+            } else {
+                showError('Invalid data received from API');
+            }
+        })
+        .catch(error => {
+            loadingIndicator.style.display = 'none';
+            showError('Error fetching farm locations: ' + error.message);
+        });
+}
+
+
+
+
+
+// Function to add markers for farm locations with glowing effect
+function addFarmLocationMarkers(locations) {
+    // Clear any existing farm markers
+    clearFarmMarkers();
+
+    // Create a marker group to hold all farm markers
+    farmLayerGroup = L.layerGroup();
+
+    // Create custom icon for farm locations with glowing halo effect
+    const farmIcon = L.divIcon({
+        className: 'farm-location-marker',
+        html: `
+            <div class="farm-marker-container" style="position: relative; width: 100%; height: 100%;">
+                <!-- Outer glow (largest) -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 22px; height: 22px; border-radius: 50%; background-color: rgba(39, 174, 96, 0.2); 
+                    animation: pulse 2s infinite;">
+                </div>
+                <!-- Middle glow -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 18px; height: 18px; border-radius: 50%; background-color: rgba(39, 174, 96, 0.3); 
+                    animation: pulse 2s infinite 0.3s;">
+                </div>
+                <!-- Inner glow -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 14px; height: 14px; border-radius: 50%; background-color: rgba(39, 174, 96, 0.4); 
+                    animation: pulse 2s infinite 0.6s;">
+                </div>
+                <!-- Actual marker (center) -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 8px; height: 8px; border-radius: 50%; background-color: #27ae60; 
+                    border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                </div>
+            </div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+
+    // Add animation style for the pulsing effect
+    if (!document.getElementById('farm-marker-animation')) {
+        const style = document.createElement('style');
+        style.id = 'farm-marker-animation';
+        style.textContent = `
+            @keyframes pulse {
+                0% {
+                    transform: translate(-50%, -50%) scale(0.8);
+                    opacity: 0.8;
+                }
+                50% {
+                    transform: translate(-50%, -50%) scale(1);
+                    opacity: 0.5;
+                }
+                100% {
+                    transform: translate(-50%, -50%) scale(0.8);
+                    opacity: 0.8;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Add markers for each location
+    locations.forEach(location => {
+        // Check if location has valid coordinates
+        if (location.lat && location.long) {
+            // Create marker
+            const marker = L.marker([location.lat, location.long], {
+                icon: farmIcon
+            });
+
+            // Create popup content
+            let popupContent = `<div class="farm-popup">`;
+
+            // Add farm name if available
+            if (location.farmname) {
+                popupContent += `<strong>Farm: ${location.farmname}</strong><br>`;
+            }
+
+            // Add farm ID
+            popupContent += `Farm ID: ${location.farmid}<br>`;
+
+            // Add user ID if available
+            if (location.user_id) {
+                popupContent += `User ID: ${location.user_id}<br>`;
+            }
+
+            // Add tree type if available
+            if (location.tree_type) {
+                popupContent += `Tree Type: ${location.tree_type}<br>`;
+            }
+
+            // Add exhibit status
+            popupContent += `Exhibit: ${location.is_exhibit ? 'Yes' : 'No'}<br><br>`;
+
+            // Add button to add farm as a destination
+            popupContent += `<button class="add-farm-destination" 
+                data-lat="${location.lat}" 
+                data-long="${location.long}" 
+                data-name="${location.farmname || ('Farm ' + location.farmid)}"
+                style="background-color: #3498db; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-weight: bold;">
+                Add to Destinations
+            </button>`;
+
+            popupContent += `</div>`;
+
+            // Create popup with custom content
+            const popup = L.popup().setContent(popupContent);
+
+            // Bind popup to marker
+            marker.bindPopup(popup);
+
+            // Add event listener to the Add to Destinations button after popup opens
+            marker.on('popupopen', function () {
+                // Find the button in the popup
+                const addButton = document.querySelector('.add-farm-destination');
+                if (addButton) {
+                    // Add click event listener
+                    addButton.addEventListener('click', function () {
+                        // Get coordinates and name from data attributes
+                        const lat = parseFloat(this.getAttribute('data-lat'));
+                        const long = parseFloat(this.getAttribute('data-long'));
+                        const name = this.getAttribute('data-name');
+
+                        // Check if we can add more destinations
+                        if (destinationCount >= maxDestinations) {
+                            showError(`Maximum of ${maxDestinations} destinations allowed`);
+                            return;
+                        }
+
+                        // Add the farm as a destination
+                        const index = addDestinationField({ lat: lat, lng: long });
+
+                        // Update the input field with the farm name
+                        const inputs = document.querySelectorAll('.destination-input');
+                        if (inputs[index]) {
+                            inputs[index].value = name;
+                        }
+
+                        // Close the popup
+                        marker.closePopup();
+
+                        // Show success message
+                        showInfo(`Added ${name} to destinations`);
+                    });
+                }
+            });
+
+            // Add tooltip with name
+            if (location.farmname) {
+                marker.bindTooltip(`Farm: ${location.farmname}`);
+            }
+
+            // Add marker to group
+            marker.addTo(farmLayerGroup);
+
+            // Store marker for later removal
+            farmMarkers.push(marker);
+        }
+    });
+
+    // Add the layer group to the map
+    farmLayerGroup.addTo(map);
+
+    // Show info message about the number of locations
+    showInfo(`Showing ${farmMarkers.length} farm locations`);
+}
+
+// Function to clear farm markers
+function clearFarmMarkers() {
+    if (farmLayerGroup) {
+        map.removeLayer(farmLayerGroup);
+    }
+    farmMarkers = [];
+    farmLayerGroup = null;
+    farmsVisible = false;
+    updateFarmToggleButton();
+}
+
+// Function to show farms
+function showFarms() {
+    if (farmLayerGroup) {
+        farmLayerGroup.addTo(map);
+        farmsVisible = true;
+        showInfo(`Showing ${farmMarkers.length} farm locations`);
+        updateFarmToggleButton();
+    }
+}
+
+// Function to hide farms
+function hideFarms() {
+    if (farmLayerGroup) {
+        map.removeLayer(farmLayerGroup);
+        farmsVisible = false;
+        showInfo('Farm locations hidden');
+        updateFarmToggleButton();
+    }
+}
+
+// Update farm toggle button text based on visibility state
+function updateFarmToggleButton() {
+    const toggleButton = document.querySelector('.farm-toggle-button');
+    if (toggleButton) {
+        if (farmsVisible) {
+            toggleButton.innerHTML = `<span class="material-symbols-outlined">visibility_off</span> Hide Farms`;
+        } else {
+            toggleButton.innerHTML = `<span class="material-symbols-outlined">visibility</span> Show Farms`;
+        }
+    }
+}
+
+// Add a function to show info messages
+function showInfo(message) {
+    const infoEl = document.createElement('div');
+    infoEl.className = 'info-message';
+    infoEl.textContent = message;
+    infoEl.style.position = 'absolute';
+    infoEl.style.bottom = '20px';
+    infoEl.style.left = '50%';
+    infoEl.style.transform = 'translateX(-50%)';
+    infoEl.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+    infoEl.style.color = 'gray';
+    infoEl.style.padding = '8px 16px';
+    infoEl.style.borderRadius = '4px';
+    infoEl.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    infoEl.style.zIndex = '1000';
+
+    // Add to document
+    document.body.appendChild(infoEl);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+        if (document.body.contains(infoEl)) {
+            document.body.removeChild(infoEl);
+        }
+    }, 3000);
+}
+
+// Add farm toggle button
+function addFarmToggleButton() {
+    // Create toggle control
+    const FarmToggleControl = L.Control.extend({
+        options: {
+            position: 'topright'
+        },
+
+        onAdd: function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+
+            // Create toggle button
+            const button = L.DomUtil.create('a', 'farm-toggle-button', container);
+            button.href = '#';
+            button.innerHTML = `<span class="material-symbols-outlined">visibility</span> Show Farms`;
+
+            // Style the button
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.padding = '6px 10px';
+            button.style.backgroundColor = 'white';
+            button.style.color = '#27ae60';
+            button.style.fontWeight = 'bold';
+            button.style.textDecoration = 'none';
+            button.style.borderRadius = '4px';
+            //button.style.border = '2px solid #27ae60';
+            button.style.textAlign = 'center';
+            button.style.minWidth = '100px';
+
+            // Add spacing between icon and text
+            const iconStyle = document.createElement('style');
+            iconStyle.innerHTML = `
+                .farm-toggle-button .material-symbols-outlined {
+                    margin-right: 6px;
+                    font-size: 18px;
+                    vertical-align: middle;
+                }
+            `;
+            document.head.appendChild(iconStyle);
+
+            // Toggle farm locations when clicked
+            L.DomEvent.on(button, 'click', function (e) {
+                L.DomEvent.preventDefault(e);
+                fetchAndDisplayFarmLocations();
+            });
+
+            // Prevent map click events from being triggered
+            L.DomEvent.disableClickPropagation(container);
+
+            return container;
+        }
+    });
+
+    // Add the control to the map
+    map.addControl(new FarmToggleControl());
+}
+
+// Call the function to initialize the farm toggle button
+document.addEventListener('DOMContentLoaded', function () {
+    // Add the farm toggle button
+    addFarmToggleButton();
+});
+
+
+
+
+
+
+
+
+
+
+
+// Function to create Google Maps link from optimized route waypoints
+function createGoogleMapsLink(optimizedWaypoints) {
+    // We need at least 2 waypoints to create a route
+    if (!optimizedWaypoints || optimizedWaypoints.length < 2) {
+        return null;
+    }
+
+    // Extract origin (first waypoint)
+    const origin = optimizedWaypoints[0];
+    const originCoords = `${origin.latLng.lat},${origin.latLng.lng}`;
+
+    // Extract destination (last waypoint)
+    const destination = optimizedWaypoints[optimizedWaypoints.length - 1];
+    const destinationCoords = `${destination.latLng.lat},${destination.latLng.lng}`;
+
+    // Extract intermediate waypoints (all points between first and last)
+    const waypoints = optimizedWaypoints.slice(1, optimizedWaypoints.length - 1);
+
+    // Format waypoints as required by Google Maps
+    let waypointsParam = '';
+    if (waypoints.length > 0) {
+        waypointsParam = '&waypoints=' + waypoints.map(wp =>
+            `${wp.latLng.lat},${wp.latLng.lng}`
+        ).join('|');
+    }
+
+    // Construct the Google Maps URL
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${originCoords}&destination=${destinationCoords}${waypointsParam}&travelmode=driving`;
+
+    return googleMapsUrl;
+}
+
+// Function to copy text to clipboard
+function copyTextToClipboard(text) {
+    // Create a temporary element
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+
+    // Make the textarea hidden
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    // Copy text to clipboard
+    let success = false;
+    try {
+        success = document.execCommand('copy');
+    } catch (err) {
+        console.error('Failed to copy: ', err);
+    }
+
+    // Clean up
+    document.body.removeChild(textArea);
+    return success;
+}
+
+// Function to show copy success message
+function showCopySuccess() {
+    // Create the message element
+    const message = document.createElement('div');
+    message.textContent = 'Link copied to clipboard!';
+    message.style.position = 'fixed';
+    message.style.bottom = '20px';
+    message.style.left = '50%';
+    message.style.transform = 'translateX(-50%)';
+    message.style.backgroundColor = 'rgba(39, 174, 96, 0.9)';
+    message.style.color = 'white';
+    message.style.padding = '8px 16px';
+    message.style.borderRadius = '4px';
+    message.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    message.style.zIndex = '1000';
+
+    // Add to document
+    document.body.appendChild(message);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+        if (document.body.contains(message)) {
+            document.body.removeChild(message);
+        }
+    }, 2000);
+}
+
+// Function to add Copy Link button to results section
+function addGoogleMapsButton(optimizedWaypoints) {
+    // Find the results section
+    const resultsSection = document.getElementById('results');
+
+    // Generate the Google Maps URL
+    const googleMapsUrl = createGoogleMapsLink(optimizedWaypoints);
+    if (!googleMapsUrl) return;
+
+    // Check if results section exists and button doesn't already exist
+    if (resultsSection && !document.getElementById('copy-gmaps-link')) {
+        // Create button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'google-maps-container';
+        buttonContainer.style.marginTop = '15px';
+
+        /* Commented out Google Maps button
+        // Create the Open in Google Maps button
+        const openButton = document.createElement('button');
+        openButton.id = 'open-in-gmaps';
+        openButton.className = 'google-maps-button';
+        openButton.innerHTML = `
+            <span class="material-symbols-outlined">map</span>
+            Open in Google Maps
+        `;
+        openButton.style.backgroundColor = '#4285F4'; // Google blue
+        
+        // Add click handler for open button
+        openButton.addEventListener('click', function() {
+            // Open the URL in a new tab
+            window.open(googleMapsUrl, '_blank');
+        });
+        */
+
+        // Create the Copy Link button
+        const copyButton = document.createElement('button');
+        copyButton.id = 'copy-gmaps-link';
+        copyButton.className = 'copy-link-button';
+        copyButton.innerHTML = `
+            <span class="material-symbols-outlined">content_copy</span>
+            Copy Google Maps Link
+        `;
+        copyButton.style.backgroundColor = '#34A853'; // Google green
+
+        // Add click handler for copy button
+        copyButton.addEventListener('click', function () {
+            // Copy the URL to clipboard
+            if (copyTextToClipboard(googleMapsUrl)) {
+                showCopySuccess();
+            }
+        });
+
+        // Add buttons to container (only copy button for now)
+        // buttonContainer.appendChild(openButton); // Commented out
+        buttonContainer.appendChild(copyButton);
+
+        // Add container to results section
+        resultsSection.appendChild(buttonContainer);
+    }
+}
+
+// Modify the existing populateDestinationsList function to add the button
+function populateDestinationsList(waypoints) {
+    destinationsList.innerHTML = '';
+
+    waypoints.forEach((waypoint, index) => {
+        const color = colors[index % colors.length];
+
+        const item = document.createElement('div');
+        item.className = 'destination-item';
+
+        // Display number (adjusted for route order)
+        const displayChar = index === 0 ? "O" : index.toString();
+
+        // Get the original label
+        const originalLabel = getDestinationLabel(waypoint.originalIndex);
+
+        // Create the route step label with flag emoji for stops (not for origin)
+        const stepLabel = index === 0 ? "Origin" : `🏳️ Stop ${index}`;
+
+        let originalOrderText = '';
+        if (waypoint.originalIndex !== index) {
+            originalOrderText = ` (${originalLabel})`;
+        }
+
+        item.innerHTML = `
+            <div class="destination-number" style="background-color: ${color};">${displayChar}</div>
+            <div><strong>${stepLabel}</strong>${originalOrderText}</div>
+        `;
+
+        destinationsList.appendChild(item);
+
+        // Add arrow between destinations
+        if (index < waypoints.length - 1) {
+            const arrow = document.createElement('div');
+            arrow.className = 'route-arrow';
+            arrow.innerHTML = '↓';
+            destinationsList.appendChild(arrow);
+        }
+    });
+
+    // Add Copy Link button after the destinations list
+    addGoogleMapsButton(waypoints);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+// Global variable to store farm data for searching
+let allFarms = [];
+
+// Function to fetch farm data for searching
+function fetchFarmData() {
+    // Only fetch if we don't already have the data
+    if (allFarms.length === 0) {
+        // Show loading indicator
+        loadingIndicator.style.display = 'block';
+
+        // Fetch data from the API
+        fetch('https://api-ma.enfarm.com/api/v1/ma/get-install-locations')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Hide loading indicator
+                loadingIndicator.style.display = 'none';
+
+                // Check if we got valid data
+                if (data && Array.isArray(data.content)) {
+                    // Store all farm data for searching
+                    allFarms = data.content.map(farm => ({
+                        id: farm.farmid,
+                        name: farm.farmname || `Farm ${farm.farmid}`,
+                        lat: farm.lat,
+                        lng: farm.long,
+                        userId: farm.user_id,
+                        treeType: farm.tree_type,
+                        isExhibit: farm.is_exhibit
+                    }));
+                } else {
+                    showError('Invalid data received from API');
+                }
+            })
+            .catch(error => {
+                loadingIndicator.style.display = 'none';
+                showError('Error fetching farm data: ' + error.message);
+            });
+    }
+}
+
+// Function to enhance the search control with farm search
+function enhanceSearchControl() {
+    // Fetch farm data when the page loads
+    fetchFarmData();
+
+    // Find the search input element
+    const searchInput = document.querySelector('.leaflet-control input[type="text"]');
+
+    if (searchInput) {
+        // Create a suggestions container
+        const suggestionsContainer = document.createElement('div');
+        suggestionsContainer.className = 'search-suggestions';
+        suggestionsContainer.style.display = 'none';
+        suggestionsContainer.style.position = 'absolute';
+        suggestionsContainer.style.zIndex = '1000';
+        suggestionsContainer.style.backgroundColor = 'white';
+        suggestionsContainer.style.width = '300px';
+        suggestionsContainer.style.maxHeight = '200px';
+        suggestionsContainer.style.overflowY = 'auto';
+        suggestionsContainer.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+        suggestionsContainer.style.borderRadius = '0 0 4px 4px';
+        suggestionsContainer.style.border = '1px solid #ccc';
+        suggestionsContainer.style.top = '100%';
+        suggestionsContainer.style.left = '0';
+
+        // Add the suggestions container after the search input
+        searchInput.parentNode.style.position = 'relative';
+        searchInput.parentNode.appendChild(suggestionsContainer);
+
+        // Add event listener for input to show suggestions
+        searchInput.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+
+            // Clear suggestions
+            suggestionsContainer.innerHTML = '';
+
+            // If query is empty, hide suggestions
+            if (query.length < 2) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+
+            // Filter farms by name
+            const filteredFarms = allFarms.filter(farm =>
+                farm.name.toLowerCase().includes(query)
+            );
+
+            // Show suggestions if we have any
+            if (filteredFarms.length > 0) {
+                // Create suggestion items
+                filteredFarms.slice(0, 20).forEach(farm => {
+                    const item = document.createElement('div');
+                    item.className = 'suggestion-item';
+                    item.style.padding = '8px 12px';
+                    item.style.cursor = 'pointer';
+                    item.style.borderBottom = '1px solid #eee';
+                    item.style.display = 'flex';
+                    item.style.alignItems = 'center';
+
+                    // Add a green dot icon for farm
+                    item.innerHTML = `
+                        <div style="background-color: #27ae60; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px;"></div>
+                        <div>${farm.name}</div>
+                    `;
+
+                    // Add hover effect
+                    item.addEventListener('mouseenter', function () {
+                        this.style.backgroundColor = '#f0f0f0';
+                    });
+
+                    item.addEventListener('mouseleave', function () {
+                        this.style.backgroundColor = 'white';
+                    });
+
+                    // Add click event to select this farm
+                    item.addEventListener('click', function () {
+                        // Set the search input value to the farm name
+                        searchInput.value = farm.name;
+
+                        // Hide suggestions
+                        suggestionsContainer.style.display = 'none';
+
+                        // Pan to the farm location
+                        map.setView([farm.lat, farm.lng], 15);
+
+                        // Create a temporary marker for the farm
+                        const farmIcon = L.divIcon({
+                            className: 'farm-suggestion-marker',
+                            html: `
+                                <div style="background-color: #27ae60; width: 10px; height: 10px; 
+                                    border-radius: 50%; border: 2px solid white; 
+                                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                                </div>
+                            `,
+                            iconSize: [14, 14],
+                            iconAnchor: [7, 7]
+                        });
+
+                        const tempMarker = L.marker([farm.lat, farm.lng], {
+                            icon: farmIcon
+                        }).addTo(map);
+
+                        // Create a popup with farm info and add to destination button
+                        let popupContent = `
+                            <div class="farm-popup">
+                                <strong>Farm: ${farm.name}</strong><br>
+                                Farm ID: ${farm.id}<br>
+                        `;
+
+                        if (farm.userId) {
+                            popupContent += `User ID: ${farm.userId}<br>`;
+                        }
+
+                        if (farm.treeType) {
+                            popupContent += `Tree Type: ${farm.treeType}<br>`;
+                        }
+
+                        popupContent += `Exhibit: ${farm.isExhibit ? 'Yes' : 'No'}<br><br>`;
+
+                        // Add button to add farm as a destination
+                        popupContent += `
+                            <button class="add-farm-destination" 
+                                data-lat="${farm.lat}" 
+                                data-lng="${farm.lng}" 
+                                data-name="${farm.name}"
+                                style="background-color: #3498db; color: white; border: none; 
+                                    border-radius: 4px; padding: 5px 10px; cursor: pointer; 
+                                    font-weight: bold;">
+                                Add to Destinations
+                            </button>
+                        `;
+
+                        popupContent += `</div>`;
+
+                        // Create and bind popup
+                        const popup = L.popup().setContent(popupContent);
+                        tempMarker.bindPopup(popup).openPopup();
+
+                        // Add a small delay to ensure the popup DOM is fully rendered
+                        setTimeout(() => {
+                            const addButton = document.querySelector('.add-farm-destination');
+                            if (addButton) {
+                                addButton.addEventListener('click', function () {
+                                    // Get coordinates and name from data attributes
+                                    const lat = parseFloat(this.getAttribute('data-lat'));
+                                    const lng = parseFloat(this.getAttribute('data-lng'));
+                                    const name = this.getAttribute('data-name');
+
+                                    // Check if we can add more destinations
+                                    if (destinationCount >= maxDestinations) {
+                                        showError(`Maximum of ${maxDestinations} destinations allowed`);
+                                        return;
+                                    }
+
+                                    // Add the farm as a destination
+                                    const index = addDestinationField({ lat: lat, lng: lng });
+
+                                    // Update the input field with the farm name
+                                    const inputs = document.querySelectorAll('.destination-input');
+                                    if (inputs[index]) {
+                                        inputs[index].value = name;
+                                    }
+
+                                    // Close the popup and remove the temporary marker
+                                    tempMarker.closePopup();
+                                    map.removeLayer(tempMarker);
+
+                                    // Show success message
+                                    showInfo(`Added ${name} to destinations`);
+                                });
+                            }
+                        });
+                    });
+
+                    suggestionsContainer.appendChild(item);
+                });
+
+                suggestionsContainer.style.display = 'block';
+            } else {
+                suggestionsContainer.style.display = 'none';
+            }
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function (e) {
+            if (!suggestionsContainer.contains(e.target) && e.target !== searchInput) {
+                suggestionsContainer.style.display = 'none';
+            }
+        });
+
+        // Add event listener for search function to support farm names
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+
+                const query = this.value.trim();
+
+                // Check if the query matches a farm name
+                const matchingFarm = allFarms.find(farm =>
+                    farm.name.toLowerCase() === query.toLowerCase()
+                );
+
+                if (matchingFarm) {
+                    // If it's a farm, pan to it
+                    map.setView([matchingFarm.lat, matchingFarm.lng], 15);
+
+                    // Create a temporary marker as in the click handler above
+                    // (This code is duplicated from above - could be refactored into a function)
+                    const farmIcon = L.divIcon({
+                        className: 'farm-suggestion-marker',
+                        html: `
+                            <div style="background-color: #27ae60; width: 10px; height: 10px; 
+                                border-radius: 50%; border: 2px solid white; 
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                            </div>
+                        `,
+                        iconSize: [14, 14],
+                        iconAnchor: [7, 7]
+                    });
+
+                    const tempMarker = L.marker([matchingFarm.lat, matchingFarm.lng], {
+                        icon: farmIcon
+                    }).addTo(map);
+
+                    // Create popup with Add to Destinations button
+                    // (Again, duplicated code that could be refactored)
+                    let popupContent = `
+                        <div class="farm-popup">
+                            <strong>Farm: ${matchingFarm.name}</strong><br>
+                            Farm ID: ${matchingFarm.id}<br>
+                    `;
+
+                    if (matchingFarm.userId) {
+                        popupContent += `User ID: ${matchingFarm.userId}<br>`;
+                    }
+
+                    if (matchingFarm.treeType) {
+                        popupContent += `Tree Type: ${matchingFarm.treeType}<br>`;
+                    }
+
+                    popupContent += `Exhibit: ${matchingFarm.isExhibit ? 'Yes' : 'No'}<br><br>`;
+
+                    popupContent += `
+                        <button class="add-farm-destination" 
+                            data-lat="${matchingFarm.lat}" 
+                            data-lng="${matchingFarm.lng}" 
+                            data-name="${matchingFarm.name}"
+                            style="background-color: #3498db; color: white; border: none; 
+                                border-radius: 4px; padding: 5px 10px; cursor: pointer; 
+                                font-weight: bold;">
+                            Add to Destinations
+                        </button>
+                    `;
+
+                    popupContent += `</div>`;
+
+                    const popup = L.popup().setContent(popupContent);
+                    tempMarker.bindPopup(popup).openPopup();
+
+                    // Add event listener for the Add to Destinations button
+                    tempMarker.on('popupopen', function () {
+                        const addButton = document.querySelector('.add-farm-destination');
+                        if (addButton) {
+                            addButton.addEventListener('click', function () {
+                                const lat = parseFloat(this.getAttribute('data-lat'));
+                                const lng = parseFloat(this.getAttribute('data-lng'));
+                                const name = this.getAttribute('data-name');
+
+                                if (destinationCount >= maxDestinations) {
+                                    showError(`Maximum of ${maxDestinations} destinations allowed`);
+                                    return;
+                                }
+
+                                const index = addDestinationField({ lat: lat, lng: lng });
+
+                                const inputs = document.querySelectorAll('.destination-input');
+                                if (inputs[index]) {
+                                    inputs[index].value = name;
+                                }
+
+                                tempMarker.closePopup();
+                                map.removeLayer(tempMarker);
+
+                                showInfo(`Added ${name} to destinations`);
+                            });
+                        }
+                    });
+
+                    // Hide suggestions
+                    suggestionsContainer.style.display = 'none';
+                } else {
+                    // If not a farm, use the original search function
+                    searchLocation(query);
+                    suggestionsContainer.style.display = 'none';
+                }
+            }
+        });
+    }
+}
+
+// Call the enhance function when the page is loaded
+document.addEventListener('DOMContentLoaded', function () {
+    // We need to wait a bit for the search control to be created
+    setTimeout(enhanceSearchControl, 1000);
+});
+
+// Add a home button control to center on Enfarm Office
+function addHomeButton() {
+    // Create custom control
+    const HomeButton = L.Control.extend({
+        options: {
+            position: 'topleft'
+        },
+        
+        onAdd: function() {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            
+            // Create button with home icon
+            const button = L.DomUtil.create('a', 'home-button', container);
+            button.href = '#';
+            button.title = 'Return to Enfarm Office';
+            button.innerHTML = '<span class="material-symbols-outlined">home</span>';
+            
+            // Style the button
+            button.style.width = '34px';
+            button.style.height = '34px';
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.justifyContent = 'center';
+            button.style.backgroundColor = 'white';
+            button.style.color = '#000000';
+            button.style.fontSize = '18px';
+            
+            // Add click event to center map on Enfarm Office
+            L.DomEvent.on(button, 'click', function(e) {
+                L.DomEvent.preventDefault(e);
+                map.setView([12.690758, 108.0613203], 19);
+                
+                // Optional: Show a brief info message
+                showInfo('Map centered on Enfarm Office');
+            });
+            
+            // Prevent map click events from triggering
+            L.DomEvent.disableClickPropagation(container);
+            
+            return container;
+        }
+    });
+    
+    // Add the control to the map
+    map.addControl(new HomeButton());
+}
+
+// Call the function to add the home button
+addHomeButton();
